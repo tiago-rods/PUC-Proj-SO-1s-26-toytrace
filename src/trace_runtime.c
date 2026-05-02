@@ -36,38 +36,51 @@ static void fill_event_from_regs(pid_t pid,
 
 static pid_t launch_tracee(char *const argv[])
 {
-    /*
-     * TODO Semana 2:
-     *
-     * Crie o processo monitorado.
-     *
-     * Fluxo esperado:
-     * - fork()
-     * - no filho:
-     *   - ptrace(PTRACE_TRACEME, ...)
-     *   - raise(SIGSTOP)
-     *   - execvp(argv[0], argv)
-     * - no pai:
-     *   - retornar o pid do filho
-     *
-     * Em erro, imprima uma mensagem com perror() e retorne -1.
-     */
-    fprintf(stderr, "erro: TODO Semana 2: implementar launch_tracee()\n");
-    return -1;
+    pid_t child = fork();
+
+    if (child < 0) {
+        perror("Erro no fork");
+        return -1;
+    }
+
+    if (child == 0) {
+        // Filho pede para ser rastrado pelo pai
+        if(ptrace(PTRACE_TRACEME, 0, NULL, NULL) < 0) {
+            perror("Erro no ptrace");
+            _exit(1);
+        }
+
+        //
+        raise(SIGSTOP);
+
+        // O filho então executa o que foi atribuído a ele
+        execvp(argv[0], argv);
+        // Se isso retornar, quer dizer que ocorreu algum erro
+        perror("Erro ao executar");
+        _exit(1);
+    }
+
+    // Pai retorna o filho
+    return child;
 }
 
 static int wait_for_initial_stop(pid_t child)
 {
-    /*
-     * TODO Semana 2:
-     *
-     * O filho chama raise(SIGSTOP) antes de executar o programa alvo.
-     * O pai precisa esperar essa parada inicial com waitpid().
-     *
-     * Retorne 0 se o filho parou como esperado, -1 em erro.
-     */
-    fprintf(stderr, "erro: TODO Semana 2: implementar wait_for_initial_stop()\n");
-    return -1;
+    // Pai espera o filho
+    int status;
+    if (waitpid(child, &status, 0) < 0) {
+        perror("Erro no waitpid");
+        return -1;
+    }
+
+    // Filho tem que estar parado por SIGSTOP em launch_tracee
+    // Se não, então há algo de errado, então retornamos -1
+    if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP) {
+        fprintf(stderr, "Erro inesperado. status=%d\n", status);
+        return -1;
+    }
+
+    return 0;
 }
 
 static int configure_trace_options(pid_t child)
