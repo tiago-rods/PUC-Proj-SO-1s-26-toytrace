@@ -28,5 +28,26 @@ int student_pair_syscall(struct syscall_pairer *pairer,
      *   0 se ainda nao ha syscall completa
      *  -1 se a sequencia de eventos parece invalida
      */
-    return 0;
+
+    if (ev->entering) {
+        // entrada syscall
+        pairer->entry = *ev; 
+        pairer->has_entry = 1;
+        return 0;
+    } else {
+        // saída syscall
+        if (!pairer->has_entry) {
+            return -1; 
+        }
+        
+        *out = pairer->entry;
+        
+        out->ret = ev->ret;
+        out->entering = 0; 
+        
+        // Resetamos o estado para a próxima syscall
+        pairer->has_entry = 0;
+        
+        return 1;
+    }
 }

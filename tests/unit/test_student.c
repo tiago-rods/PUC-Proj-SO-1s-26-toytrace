@@ -33,8 +33,8 @@ static void test_pair_write_entry_exit(void)
     assert(out.ret == 6);
 }
 
-static void test_formatter_generic_mentions_return(void)
 {
+static void test_formatter_generic_mentions_return(void)
     struct syscall_event ev = {
         .pid = 123,
         .entering = 0,

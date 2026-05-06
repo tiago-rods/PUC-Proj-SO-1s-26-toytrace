@@ -1,0 +1,14 @@
+#ignora os executaveis e objetos
+*.o
+toytrace
+toytrace-solution
+bin/
+tests/unit/test_student
+tests/unit/test_student_solution
+tests/targets/hello_write
+tests/targets/simple_loop
+/toytrace
+/toytrace-solution
+tests/unit/test_student
+tests/unit/test_student_solution
+tests/targets/*
