@@ -9,6 +9,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+
+
 #if !defined(__x86_64__)
 #error "Este runtime didatico suporta apenas Linux x86_64."
 #endif

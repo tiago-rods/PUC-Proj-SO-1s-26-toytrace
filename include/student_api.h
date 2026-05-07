@@ -10,6 +10,7 @@
 #define MAX_FILTER_NAMES 32
 #define MAX_SYSCALL_TRACKED 512
 
+// define a estrutura do pairer
 struct syscall_pairer {
     int has_entry;
     struct syscall_event entry;

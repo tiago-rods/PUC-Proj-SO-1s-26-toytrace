@@ -3,6 +3,8 @@
 #include <string.h>
 #include <sys/syscall.h>
 
+Este arquivo funciona como um dicionário ou tradutor para o seu rastreador de chamadas de sistema.
+
 struct syscall_name_entry {
     long no;
     const char *name;
@@ -80,6 +82,13 @@ static const struct syscall_name_entry syscall_table[] = {
 #endif
 };
 
+/* Essa função funciona:
+Você entrega a ela um número (por exemplo, 0).
+Ela varre a syscall_table procurando por esse número.
+Quando encontra, ela te devolve o texto correspondente (no caso, "read").
+Se você passar um número de uma syscall muito obscura que não está na lista, ela retorna "unknown".
+*/ 
+
 const char *syscall_name(long syscall_no)
 {
     size_t i;
@@ -93,6 +102,8 @@ const char *syscall_name(long syscall_no)
     return "unknown";
 }
 
+
+// Essa faz o inverso, ao dar o nome, ela de devolve o numero da syscall
 long syscall_number_by_name(const char *name)
 {
     size_t i;
