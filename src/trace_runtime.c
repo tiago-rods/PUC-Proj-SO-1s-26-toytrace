@@ -85,49 +85,60 @@ static int wait_for_initial_stop(pid_t child)
 
 static int configure_trace_options(pid_t child)
 {
-    /*
-     * TODO Semana 3:
-     *
-     * Configure PTRACE_O_TRACESYSGOOD com PTRACE_SETOPTIONS.
-     * Isso ajuda a diferenciar paradas de syscall de outros sinais.
+    /* Configuramos o rastreamento do filho com PTRACE_O_TRACESYSGOOD
+     * Ou seja, evita que todo SIGTRAP seja tratado como syscall
      */
-    fprintf(stderr, "erro: TODO Semana 3: implementar configure_trace_options()\n");
-    return -1;
+    if ((ptrace(PTRACE_SETOPTIONS, child, NULL, PTRACE_O_TRACESYSGOOD)) < 0) {
+        perror("Erro no ptrace");
+        return -1;
+    }
+    return 0;
 }
 
 static int resume_until_next_syscall(pid_t child, int signal_to_deliver)
 {
-    /*
-     * TODO Semana 3:
-     *
-     * Use ptrace(PTRACE_SYSCALL, ...) para deixar o filho executar ate a
-     * proxima entrada ou saida de syscall.
-     *
-     * signal_to_deliver deve ser repassado como quarto argumento do ptrace.
-     */
-    fprintf(stderr, "erro: TODO Semana 3: implementar resume_until_next_syscall()\n");
-    return -1;
+    // Permissão para o filho continuar até a próxima entrada ou saída de syscall
+    if ((ptrace(PTRACE_SYSCALL, child, NULL, signal_to_deliver)) < 0) {
+        perror("Erro no ptrace");
+        return -1;
+    }
+    return 0;
 }
 
 static int wait_for_syscall_stop(pid_t child, int *status)
 {
-    /*
-     * TODO Semana 3:
-     *
-     * Espere o filho com waitpid().
-     *
-     * Retorne:
-     *   1 se a parada foi uma parada de syscall;
-     *   0 se o filho terminou normalmente ou por sinal;
-     *  -1 em erro.
-     *
-     * Dicas:
-     * - WIFEXITED e WIFSIGNALED indicam fim do processo.
-     * - WIFSTOPPED indica que o processo parou.
-     * - com PTRACE_O_TRACESYSGOOD, syscall-stops aparecem com bit 0x80.
-     * - paradas SIGTRAP comuns nao devem ser entregues de volta ao filho.
-     */
-    fprintf(stderr, "erro: TODO Semana 3: implementar wait_for_syscall_stop()\n");
+    int sinal_para_repassar = 0;
+    do {
+        // Pai espera a próxima mudança de estado
+        if (waitpid(child, status, 0) < 0) {
+            perror("Erro no waitpid");
+            return -1;
+        }
+
+        // Filho morreu ou terminou normalmente
+        if (WIFEXITED(*status) || WIFSIGNALED(*status)) {
+            return 0;
+        }
+        
+        // O filho parou e o pai precisa decidir por quê. 
+        if (WIFSTOPPED(*status)) {
+
+            int sig = WSTOPSIG(*status);
+
+            // Verifica o sinal da syscall
+            if (sig & 0x80) {
+                return 1;
+            }
+
+            /* "Uma parada comum por SIGTRAP não deve ser reenviada ao filho. Outros sinais
+             *podem ser repassados no próximo PTRACE_SYSCALL."
+             */
+             // Ou seja, temos que decidir o que passar:
+            sinal_para_repassar = (sig == SIGTRAP) ? 0 : sig;
+        }
+    } while(resume_until_next_syscall(child, sinal_para_repassar) == 0);
+
+    perror("Erro na verificacao do status");
     return -1;
 }
 
@@ -144,19 +155,23 @@ int trace_program(char *const argv[],
         return -1;
     }
 
+    // Aqui que criamos o filho e pedimos para rastreá-lo
     child = launch_tracee(argv);
     if (child < 0) {
         return -1;
     }
 
+    // Processo pai verifica se o filho está parado em SIGSTOP
     if (wait_for_initial_stop(child) < 0) {
         return -1;
     }
 
+    // Configuração das opções de rastreamento do filho
     if (configure_trace_options(child) < 0) {
         return -1;
     }
 
+    // Permite o filho executar até a próxima entrada ou saída de syscall
     if (resume_until_next_syscall(child, 0) < 0) {
         return -1;
     }
