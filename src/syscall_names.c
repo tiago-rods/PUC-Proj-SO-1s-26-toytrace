@@ -3,7 +3,7 @@
 #include <string.h>
 #include <sys/syscall.h>
 
-Este arquivo funciona como um dicionário ou tradutor para o seu rastreador de chamadas de sistema.
+// Este arquivo funciona como um dicionário ou tradutor para o seu rastreador de chamadas de sistema.
 
 struct syscall_name_entry {
     long no;
