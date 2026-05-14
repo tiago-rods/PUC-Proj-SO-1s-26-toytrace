@@ -54,8 +54,26 @@ static pid_t launch_tracee(char *const argv[])
      *
      * Em erro, imprima uma mensagem com perror() e retorne -1.
      */
-    fprintf(stderr, "erro: TODO Semana 2: implementar launch_tracee()\n");
-    return -1;
+
+    pid_t child = fork();
+    
+    if (child < 0) {
+        perror("nao foi possivel fazer o fork()");
+        return -1;
+    }
+
+    if (child == 0) {
+        if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) < 0) {
+            perror("nao foi possivel fazer o ptrace");
+            _exit(1);
+        }
+        raise(SIGSTOP);
+        execvp(argv[0], argv);
+        perror("nao foi possivel fazer execvp"); // Esta linha só será atingida se o execvp falhar
+        _exit(1);
+    }
+
+    return child; // Processo pai retorna o PID
 }
 
 static int wait_for_initial_stop(pid_t child)
@@ -68,7 +86,17 @@ static int wait_for_initial_stop(pid_t child)
      *
      * Retorne 0 se o filho parou como esperado, -1 em erro.
      */
-    fprintf(stderr, "erro: TODO Semana 2: implementar wait_for_initial_stop()\n");
+    int status;
+    if (waitpid(child, &status, 0) < 0) {
+        perror("waitpid");
+        return -1;
+    }
+    
+    // Depois do waitpid, o pai deve verificar se o filho realmente parou: WIFSTOPPED(status)
+    if (WIFSTOPPED(status)) {
+        return 0;
+    }
+    
     return -1;
 }
 
