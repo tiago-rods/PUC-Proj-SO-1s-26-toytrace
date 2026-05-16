@@ -18,20 +18,17 @@ static void fill_event_from_regs(pid_t pid,
                                  const struct user_regs_struct *regs,
                                  struct syscall_event *ev)
 {
-    /*
-     * TODO Semana 4:
-     *
-     * Preencha struct syscall_event usando os registradores x86_64.
-     *
-     * Dicas:
-     * - regs->orig_rax contem o numero da syscall.
-     * - regs->rax contem o retorno, valido na saida.
-     * - os seis argumentos ficam em rdi, rsi, rdx, r10, r8 e r9.
-     * - ev->entering deve copiar o parametro entering.
-     */
     memset(ev, 0, sizeof(*ev));
+    ev->syscall_no = regs->orig_rax;    // Número da syscall
+    ev->ret = regs->rax;                // Valor de retorno, relevante na saída
+    ev->args[0] = regs->rdi;
+    ev->args[1] = regs->rsi;
+    ev->args[2] = regs->rdx;            // Argumentos
+    ev->args[3] = regs->r10;
+    ev->args[4] = regs->r8;
+    ev->args[5] = regs->r9;
     ev->pid = pid;
-    ev->entering = entering;
+    ev->entering = entering;            // Indica a entrada ou saída
 }
 
 static pid_t launch_tracee(char *const argv[])
@@ -50,7 +47,7 @@ static pid_t launch_tracee(char *const argv[])
             _exit(1);
         }
 
-        //
+        // Para o filho
         raise(SIGSTOP);
 
         // O filho então executa o que foi atribuído a ele
@@ -181,10 +178,13 @@ int trace_program(char *const argv[],
         struct syscall_event ev;
         int stop_kind;
 
+        // Pausa a execução do pai e espera o filho fazer uma syscall
         stop_kind = wait_for_syscall_stop(child, &status);
         if (stop_kind < 0) {
             return -1;
         }
+
+        // Se stop_kind for 0, o processo filho terminou a sua vida útil (não é syscall)
         if (stop_kind == 0) {
             if (WIFEXITED(status)) {
                 return WEXITSTATUS(status);
@@ -195,20 +195,22 @@ int trace_program(char *const argv[],
             return 0;
         }
 
-        /*
-         * TODO Semana 4:
-         *
-         * Use PTRACE_GETREGS para preencher regs.
-         * Depois chame fill_event_from_regs() e observer().
-         */
+        // Limpa o cache de regs
         memset(&regs, 0, sizeof(regs));
+
+        // Recebe os registradores da syscall
+        ptrace(PTRACE_GETREGS, child, NULL, &regs);
+
+        // Preenche a struct event com os registradores
         fill_event_from_regs(child, entering, &regs, &ev);
         if (observer != NULL) {
             observer(&ev, userdata);
         }
 
+        // Inverte a fase da syscall para a próxima parada (entrada ou saída)
         entering = !entering;
 
+        // Libera o filho do congelamento para ele continuar rodando até a próxima syscall
         if (resume_until_next_syscall(child, 0) < 0) {
             return -1;
         }

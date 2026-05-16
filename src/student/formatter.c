@@ -9,30 +9,26 @@ void student_debug_raw_event(const struct syscall_event *ev,
                              size_t bufsz)
 {
     /*
-     * Suporte de depuracao para a Semana 4:
-     *
-     * Esta funcao existe para inspecionar eventos crus depois que o runtime
-     * ja consegue parar em syscalls e preencher struct syscall_event.
-     * Ela nao e a formatacao final do projeto.
-     *
-     * Experimento sugerido:
-     * - imprima o nome da syscall;
-     * - imprima se o evento e entrada ou saida;
-     * - imprima o pid;
-     * - em eventos de entrada, observe os argumentos;
-     * - em eventos de saida, observe o valor de retorno.
-     *
-     * Depois compare a saida de:
-     *
-     *   ./toytrace trace --raw-events -- ./tests/targets/hello_write
-     *
-     * A pergunta importante da Semana 4 e:
-     * por que a mesma syscall aparece duas vezes?
+     * Para uma melhor visualização dos primeiros argumentos,
+     * organizamos dentro de um if para responder a pergunta
+     * "por que a mesma syscall aparece duas vezes?". Pois temos
+     * a entrada e a saída de uma syscall sendo registrada por
+     * ptrace
      */
-    snprintf(buf, bufsz, "pid=%d %s %s",
-             ev->pid,
-             syscall_name(ev->syscall_no),
-             ev->entering ? "entrada" : "saida");
+    if (ev->entering) {
+        // Na entrada, mostramos os primeiros argumentos
+        snprintf(buf, bufsz, "pid=%d %s entrada arg0=%#lx arg1=%#lx",
+                 ev->pid,
+                 syscall_name(ev->syscall_no),
+                 ev->args[0],
+                 ev->args[1]);
+    } else {
+        // Na saída, mostramos o que a syscall devolveu
+        snprintf(buf, bufsz, "pid=%d %s saida ret=%ld",
+                 ev->pid,
+                 syscall_name(ev->syscall_no),
+                 ev->ret);
+    }
 }
 
 void student_format_event(const struct syscall_event *ev,
