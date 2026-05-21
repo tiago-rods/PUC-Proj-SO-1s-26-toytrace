@@ -8,7 +8,7 @@
 struct syscall_event {
     pid_t pid;
     int entering;              /* 1 na entrada da syscall, 0 na saida */
-    long syscall_no;
+    long syscall_no;           // numero da syscall
     long ret;                  /* valido apenas em eventos de saida */
     unsigned long args[6];     /* argumentos capturados na entrada */
 };

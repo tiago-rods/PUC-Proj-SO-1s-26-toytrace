@@ -7,7 +7,7 @@
 struct trace_state {
     // Diz se o usuário pediu para imprimir os eventos no modo cru.
     int raw_events;
-    // Essa estrutura está em student_api.h e funciona como uma memória de verificação de eventos para guardar os entados de entrada e saída controlando o processo
+    // Essa estrutura está em student_api.h e funciona como uma memória de verificação de eventos para guardar os estados de entrada e saída controlando o processo
     struct syscall_pairer pairer;
 };
 
