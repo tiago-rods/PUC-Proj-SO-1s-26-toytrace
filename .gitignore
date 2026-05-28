@@ -1,1 +1,6 @@
 *.o
+toytrace
+toytrace-solution
+bin/
+/toytrace
+/toytrace-solution
