@@ -1,105 +1,89 @@
-# toytrace
+# Toytrace
 
-`toytrace` e um projeto didatico de Sistemas Operacionais. O objetivo e construir
-um pequeno monitor de chamadas de sistema em Linux, inspirado pelo `strace`, mas
-com escopo muito menor.
+`toytrace` é um projeto didático de Sistemas Operacionais. O objetivo é construir um pequeno monitor de chamadas de sistema (system calls) em Linux x86_64, fortemente inspirado no clássico `strace`, mas com escopo reduzido e simplificado para aprendizado.
 
-O projeto usa um runtime parcialmente preenchido. A CLI e alguns helpers sao
-fornecidos pelo professor, mas os estudantes implementam partes importantes do
-fluxo de `ptrace`:
+O projeto intercepta e exibe no terminal as chamadas de sistema feitas por um processo filho, detalhando seus argumentos de entrada e seus respectivos códigos de retorno.
 
-- criacao do processo monitorado com `fork`, `PTRACE_TRACEME`, `SIGSTOP` e
-  `execvp`;
-- loop com `waitpid`, `PTRACE_SYSCALL` e `PTRACE_O_TRACESYSGOOD`;
-- leitura de registradores com `PTRACE_GETREGS`;
-- preenchimento de `struct syscall_event`;
-- pareamento entre entrada e saida de syscalls;
-- formatacao das chamadas observadas;
-- decodificacao minima de alguns argumentos.
+---
 
-## Compilacao
+##  Arquitetura e Fluxo de Execução
 
+O `toytrace` é estruturado em duas camadas principais: o **Runtime de Baixo Nível** (que interage diretamente com as APIs do Kernel Linux via `ptrace`) e o **Espaço do Estudante** (responsável pelo tratamento lógico, pareamento e formatação amigável das informações obtidas).
+
+```mermaid
+graph TD
+    A[main.c] --> B[cli.c]
+    A --> C[trace_runtime.c]
+    C --> D[Callback: trace_observer]
+    D --> E[student/pairer.c]
+    E --> F[student/formatter.c]
+    F --> G[Saída no Terminal]
+```
+
+### O Fluxo de um Evento
+1. **Pausa no Kernel:** O Kernel do Linux congela o processo filho (*tracee*) na entrada e na saída de qualquer chamada de sistema.
+2. **Captura no Runtime:** O runtime do monitor (*tracer*) intercepta o congelamento, lê os registradores da CPU do filho e preenche uma estrutura portável `struct syscall_event`.
+3. **Disparo do Callback:** O runtime chama a função observadora `trace_observer` em `main.c`.
+4. **Pareamento (Pairing):** Como o processo para duas vezes por syscall (entrada e saída), a lógica em `pairer.c` retém o evento de entrada até que o evento de saída correspondente ocorra, unindo os parâmetros iniciais ao valor de retorno.
+5. **Formatação (Formatting):** Com a chamada de sistema pareada e concluída, o formatador em `formatter.c` transforma os dados em texto estruturado e legível.
+6. **Exibição:** O resultado formatado é impresso na saída padrão.
+
+---
+
+##  Estrutura do Projeto
+
+*   **`src/main.c`**: Ponto de entrada que gerencia a inicialização, o parser de CLI e a ponte entre o runtime do `ptrace` e a lógica de processamento dos eventos.
+*   **`src/cli.c`**: Processamento dos argumentos de linha de comando.
+*   **`src/trace_runtime.c`**: O núcleo de tracing de processos. Gerencia o ciclo de vida do filho via `fork`, `execvp`, e as interrupções de depuração via `ptrace`.
+*   **`src/trace_helpers.c`**: Auxiliares para ler memória de processos filhos, necessário para decodificar ponteiros de strings no espaço de memória virtual do filho (como caminhos de arquivos).
+*   **`src/syscall_names.c`**: Mapeamento que converte códigos numéricos das syscalls para seus nomes textuais correspondentes.
+*   **`include/`**: Arquivos de cabeçalho (`.h`) contendo definições de structs como `struct syscall_event` e interfaces de APIs.
+*   **`src/student/`**:
+    *   `pairer.c`: Lógica de associação entre entrada e saída de syscalls.
+    *   `formatter.c`: Formatação final em strings textuais legíveis para apresentação ao usuário.
+
+---
+
+##  Compilação e Uso
+
+### Compilar o projeto
+Para gerar o binário `toytrace`, execute:
 ```bash
 make
 ```
 
-O binario gerado se chama `toytrace`.
-
-## Uso
-
+### Executar a monitoria (Modo Tradicional)
+Para rastrear um programa alvo e visualizar suas chamadas de forma formatada:
 ```bash
-./toytrace trace -- /bin/echo oi
+./toytrace trace -- /bin/echo "Olá Mundo"
+```
+
+### Executar em modo cru (Raw Events)
+Para imprimir diretamente as interrupções de entrada/saída cruas disparadas pelo `ptrace`:
+```bash
 ./toytrace trace --raw-events -- ./tests/targets/hello_write
 ```
 
-Para ver a ajuda:
-
+### Ver a ajuda da CLI
 ```bash
 ./toytrace --help
 ```
 
-## Testes
+---
 
-A suite de testes fornecida sera usada pelo professor para validar a entrega.
-Voce pode criar testes adicionais durante o desenvolvimento, mas isso nao e
-obrigatorio.
+##  Testes
 
-Antes de entregar, execute:
-
+A suíte de testes valida a corretude das funções implementadas. Para rodar todos os testes automatizados, utilize:
 ```bash
 make test
 ```
 
-Passar nos testes nao garante nota maxima: a clareza da implementacao, a
-correcao do codigo, a decomposicao dos commits e o relatorio tambem serao
-avaliados.
 
-## O que o professor fornece
+---
 
-Arquivos fornecidos ou parcialmente fornecidos:
+##  Especificações de Formatação das Syscalls
 
-- `src/trace_runtime.c`
-- `src/trace_helpers.c`
-- `src/syscall_names.c`
-- headers em `include/`
-- CLI e callbacks em `src/main.c` e `src/cli.c`
-
-`src/trace_runtime.c` tem TODOs importantes. Ele nao deve virar um debugger
-completo, mas os grupos devem implementar o fluxo essencial de tracing.
-
-## O que os estudantes implementam
-
-Arquivos em `src/student/`:
-
-- `pairer.c`: combina evento de entrada e evento de saida da mesma syscall;
-- `formatter.c`: imprime syscalls completas em formato legivel.
-
-Na Semana 1, use:
-
-```bash
-./tests/targets/hello_write
-./toytrace trace -- ./tests/targets/hello_write
-```
-
-No inicio do projeto, o segundo comando deve parar no primeiro TODO de
-`src/trace_runtime.c`:
-
-```text
-erro: TODO Semana 2: implementar launch_tracee()
-```
-
-A primeira semana e dedicada a exploracao do codigo. Antes de implementar as
-funcoes principais, o grupo deve ler o caminho `main -> CLI -> runtime ->
-callback -> src/student`, fazer pequenos experimentos reversiveis e criar um
-mapa mental do projeto.
-
-O modo `--raw-events` continua existindo, mas so sera util depois da Semana 4,
-quando o runtime ja conseguir parar em syscalls e preencher `struct
-syscall_event`.
-
-## Syscalls obrigatorias
-
-As syscalls abaixo devem ter formatacao especifica:
+As seguintes syscalls devem ser interceptadas e impressas em formato específico e detalhado:
 
 ```text
 read(fd, buf, count) = ret
@@ -109,18 +93,13 @@ execve("path", ...) = ret
 exit_group(status) = ret
 ```
 
-Outras syscalls podem aparecer em formato generico:
-
+Qualquer outra chamada não especificada acima pode ser exibida de forma genérica no formato:
 ```text
-nome(arg0, arg1, arg2, arg3, arg4, arg5) = ret
+nome_da_syscall(arg0, arg1, arg2, arg3, arg4, arg5) = ret
 ```
 
-## Helpers de memoria do processo monitorado
 
-Use:
-
-```c
-int read_child_string(pid_t pid, unsigned long addr, char *buf, size_t bufsz);
-```
-
-`read_child_string` deve ser usado para caminhos como `openat` e `execve`.
+> Para obter strings de parâmetros como os caminhos em `openat` e `execve`, utilize a função auxiliar disponível no runtime:
+> ```c
+> int read_child_string(pid_t pid, unsigned long addr, char *buf, size_t bufsz);
+> ```
